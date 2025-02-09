@@ -1,6 +1,6 @@
 ﻿/*
  * Minecraft Mod Environment Separators
- * MMES v1.0.0 by ClouderyStudio
+ * MMES v1.0.1 by ClouderyStudio
  * Licensed by MIT.
  */
 
@@ -11,16 +11,18 @@ using Newtonsoft.Json.Linq;
 #region Datas
 using System.IO.Compression;
 
-const string verCode = "v1.0.0";
+const string verCode = "v1.0.1";
 const string logo = $@"███╗   ███╗███╗   ███╗███████╗███████╗
 ████╗ ████║████╗ ████║██╔════╝██╔════╝
 ██╔████╔██║██╔████╔██║█████╗  ███████╗
 ██║╚██╔╝██║██║╚██╔╝██║██╔══╝  ╚════██║
 ██║ ╚═╝ ██║██║ ╚═╝ ██║███████╗███████║
 ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝
-MMES {verCode}";
-string targetPath = AppDomain.CurrentDomain.BaseDirectory;
-bool programRun = true;
+MMES {verCode}
+支持的模组加载器: Fabric";
+var targetPath = AppDomain.CurrentDomain.BaseDirectory;
+var programRun = true;
+var keepStatus = KeepStatus.Unset;
 #endregion
 
 #region ProgramMain
@@ -35,8 +37,8 @@ while (programRun)
     switch (path)
     {
         case "setTargetPath":
-            bool unsuccessed = true;
-            while (unsuccessed)
+            var succeed = false;
+            while (!succeed)
             {
                 Console.WriteLine("请输入位置,输入cancel以取消:");
                 Console.Write("> ");
@@ -47,7 +49,7 @@ while (programRun)
                 }
                 else if (enteredString == "cancel")
                 {
-                    unsuccessed = false;
+                    succeed = true;
                     break;
                 }
                 else if (!Path.Exists(enteredString))
@@ -58,84 +60,116 @@ while (programRun)
                 {
                     targetPath = enteredString;
                     Console.WriteLine($"已设定为{targetPath}");
-                    unsuccessed = false;
+                    succeed = true;
                     break;
                 }
             }
+
             break;
         case null:
             Console.WriteLine("请输入文本.");
             break;
         case "exit":
             programRun = false;
-            Console.WriteLine("Goodbye!");
             break;
         default:
             if (!Path.Exists(path))
             {
-                Console.WriteLine("路径不存在,请重试");
+                Console.WriteLine("路径或命令不存在,请重试");
                 break;
             }
-            else
-            {
-                Console.WriteLine($"开始执行任务：{path}到{targetPath}");
-                var jarFiles = Directory.GetFiles(path, "*.jar", SearchOption.AllDirectories);
-                foreach (var jarFile in jarFiles)
+
+            Console.WriteLine($"开始执行任务：{path}到{targetPath}");
+            var jarFiles = Directory.GetFiles(path, "*.jar", SearchOption.AllDirectories);
+            foreach (var jarFile in jarFiles)
+                try
                 {
-                    try
+                    string? jsonContent = null;
+                    using (var archive = ZipFile.OpenRead(jarFile))
                     {
-                        // 读取fabric.mod.json文件内容
-                        string? jsonContent = null;
-                        using (var archive = ZipFile.OpenRead(jarFile))
-                        {
-                            Console.WriteLine($"读取文件 {jarFile}");
-                            // 查找fabric.mod.json文件
-                            var fabricModJsonEntry = archive.Entries.FirstOrDefault(e => e.Name == "fabric.mod.json");
-                            if (fabricModJsonEntry != null)
+                        Console.WriteLine($"读取文件 {jarFile}");
+
+                        var fabricModJsonEntry = archive.Entries.FirstOrDefault(e => e.Name == "fabric.mod.json");
+                        if (fabricModJsonEntry != null)
+                            using (var stream = fabricModJsonEntry.Open())
+                            using (var reader = new StreamReader(stream))
                             {
-                                using (var stream = fabricModJsonEntry.Open())
-                                using (var reader = new StreamReader(stream))
-                                {
-                                    jsonContent = reader.ReadToEnd();
-                                }
+                                jsonContent = reader.ReadToEnd();
                             }
-                        } // 这里会关闭ZipArchive，释放文件锁
+                        else
+                            Console.WriteLine($"{jarFile}不是fabric模组，跳过");
+                    }
 
-                        // 如果读取到了fabric.mod.json文件内容
-                        if (jsonContent != null)
+                    if (jsonContent != null)
+                    {
+                        var jsonObject = JObject.Parse(jsonContent);
+
+                        var environmentJObject = jsonObject["environment"];
+                        var environment = environmentJObject?.ToString();
+                        if (environmentJObject == null && keepStatus == KeepStatus.KeepCopy)
                         {
-                            var jsonObject = JObject.Parse(jsonContent);
+                            Console.WriteLine($"已按照之前的选项，将Environment为null的文件{jarFile}视为'*'模组");
+                            environment = "*";
+                        }
 
-                            // 检查environment字段
-                            var environment = jsonObject["environment"]?.ToString();
-                            if (environment == "*" || environment == "server")
+                        if (environmentJObject == null && keepStatus == KeepStatus.KeepSkip)
+                            Console.WriteLine($"已按照之前的选项，跳过了Environment为null的文件{jarFile}");
+
+                        if (environmentJObject == null && keepStatus == KeepStatus.Unset)
+                        {
+                            Console.WriteLine($"{jarFile}的Environment是null，是否复制到TargetPath?");
+                            Console.WriteLine("输入y以继续，n以跳过该文件，k<y/n>以对后续文件执行同样操作。(默认:y)");
+                            Console.Write("> ");
+                            var enteredString = Console.ReadLine();
+                            switch (enteredString)
                             {
-                                // 复制JAR文件到程序执行的位置
-                                string fileName = Path.GetFileName(jarFile);
-                                string destinationPath = Path.Combine(targetPath, fileName);
-
-                                // 如果目标文件已存在，先删除
-                                if (File.Exists(destinationPath))
-                                {
-                                    File.Delete(destinationPath);
-                                }
-
-                                File.Copy(jarFile, destinationPath);
-                                Console.WriteLine($"已复制文件: {jarFile} to {destinationPath}");
-                            }
-                            else
-                            {
-                                Console.WriteLine($"{jarFile}的Environment是{environment}，跳过");
+                                default:
+                                    keepStatus = KeepStatus.Unset;
+                                    environment = "*";
+                                    break;
+                                case "n":
+                                    keepStatus = KeepStatus.Unset;
+                                    break;
+                                case "ky":
+                                    keepStatus = KeepStatus.KeepCopy;
+                                    environment = "*";
+                                    break;
+                                case "kn":
+                                    keepStatus = KeepStatus.KeepSkip;
+                                    break;
                             }
                         }
-                    }
-                    catch (Exception ex)
-                    {
-                        Console.WriteLine($"Error processing {jarFile}: {ex.Message}");
+
+                        if (environment == "*" || environment == "server")
+                        {
+                            var fileName = Path.GetFileName(jarFile);
+                            var destinationPath = Path.Combine(targetPath, fileName);
+
+                            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+
+                            File.Copy(jarFile, destinationPath);
+                            Console.WriteLine($"已复制文件: {jarFile} to {destinationPath}");
+                        }
+                        else
+                        {
+                            Console.WriteLine($"{jarFile}的Environment是{environment}，跳过");
+                        }
                     }
                 }
-                break;
-            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Error processing {jarFile}: {ex.Message}");
+                }
+
+            Console.WriteLine("任务已完成!");
+            break;
     }
+}
+
+internal enum KeepStatus
+{
+    KeepCopy,
+    KeepSkip,
+    Unset
 }
 #endregion
