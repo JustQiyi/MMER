@@ -29,10 +29,10 @@ jobs:
       
     - name: Zip the Build
       run: |
-        cd ./src/MMES/bin/Release
+        cd ./MMES/bin/Release
         zip -r MMES-net8.0-autobuild.zip ./net8.0/ 
-        cd ../../../../
-        mv ./src/MMES/bin/Release/*.zip ./
+        cd ../../../
+        mv ./MMES/bin/Release/*.zip ./
       
     - name: Create Release and Upload Release Asset
       uses: softprops/action-gh-release@v1
