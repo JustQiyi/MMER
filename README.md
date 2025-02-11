@@ -14,16 +14,16 @@
 5. 完成
 
 ## 支持的加载器
-- Forge ⚠(即将推出)
+- Forge ⚠(长期决议)
 - Fabric √(完全支持)
-- Quilt ×(不会支持)
-- NeoForge ⚠(即将退出)
+- Quilt 🐌(即将推出)
+- NeoForge ⚠(长期决议)
 
 ## TODO
 - 更详细护眼的打印与日志系统
-- 优化整体代码结构、指令化
+- 支持 Quilt
 - 支持 Forge 与 NeoForge
 - GUI(低重心)
 
 ## 协议
-MIT
+### MIT
