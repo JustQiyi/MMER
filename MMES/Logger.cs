@@ -2,19 +2,20 @@
 
 internal struct Logger
 {
-    public enum LogLevel
+    internal enum LogLevel
     {
         Info,
         Success,
         Warn,
         Error
     }
+
     /// <summary>
-    /// 记录日志
+    ///     记录日志
     /// </summary>
     /// <param name="content">内容</param>
     /// <param name="logLevel">等级(默认Info)</param>
-    public static void Log(string content, LogLevel logLevel = LogLevel.Info)
+    internal static void Log(string content, LogLevel logLevel = LogLevel.Info)
     {
         // TODO: 将日志内容写入文件
         Thread.CurrentThread.Name ??= "Main";
