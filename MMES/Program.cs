@@ -1,6 +1,6 @@
 ﻿/*
  * Minecraft Mod Environment Separators
- * MMES v1.0.2 by ClouderyStudio
+ * 作者: JustQiyi
  * 使用MIT协议分发.
  */
 
