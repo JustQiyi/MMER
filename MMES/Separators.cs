@@ -73,23 +73,55 @@ internal class Separators
         }
     }
 
-    internal static void ForgeModSeparator(ZipArchiveEntry forgeModTomlEntry, string jarFile)
+    // feat: neoforge supported
+    // 大致实现方法：解析neoForgeModTomlEntry
+    // 获取 modId 为 Minecraft 的 Dependency 的 side，若 side == "both" 或 "server" 则复制
+    /* Example:
+     * [dependencies.Minecraft]
+     * modId = "minecraft"
+     * version = "1.17.1"
+     * side = "BOTH" or "CLIENT" or "SERVER" :: Important
+     */
+    internal static void NeoForgeModSeparator(ZipArchiveEntry neoForgeModTomlEntry, string jarFile)
     {
         string tomlContent;
-        using (var stream = forgeModTomlEntry.Open())
+        using (var stream = neoForgeModTomlEntry.Open())
         using (var reader = new StreamReader(stream))
         {
             tomlContent = reader.ReadToEnd();
         }
 
-        // TODO: feat: forge supported
-        var fileName = Path.GetFileName(jarFile);
-        var destinationPath = Path.Combine(TargetPath, fileName);
+        var tomlLines = tomlContent.Split('\n');
+        string? side = null;
 
-        if (File.Exists(destinationPath)) File.Delete(destinationPath);
+        foreach (var line in tomlLines)
+            if (line.Trim().StartsWith("modId = \"minecraft\"", StringComparison.OrdinalIgnoreCase))
+            {
+                for (var i = Array.IndexOf(tomlLines, line); i < tomlLines.Length; i++)
+                    if (tomlLines[i].Trim().StartsWith("side = ", StringComparison.OrdinalIgnoreCase))
+                    {
+                        side = tomlLines[i].Split('=')[1].Trim().Trim('"').ToLower();
+                        break;
+                    }
 
-        File.Copy(jarFile, destinationPath);
-        Log($"已复制文件: {jarFile} to {destinationPath}", Success);
+                break;
+            }
+
+        if (side == "both" || side == "server")
+        {
+            var fileName = Path.GetFileName(jarFile);
+            var destinationPath = Path.Combine(TargetPath, fileName);
+
+            if (File.Exists(destinationPath)) File.Delete(destinationPath);
+
+            File.Copy(jarFile, destinationPath);
+            Log($"已复制文件: {jarFile} to {destinationPath}", Success);
+        }
+        else
+        {
+            side ??= "null";
+            Log($"{jarFile}的 side 是{side}，跳过", Warn);
+        }
     }
 
     internal enum KeepStatus
