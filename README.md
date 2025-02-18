@@ -1,6 +1,6 @@
 <div align="center">
 <h1>MMES</h1>
-<h2>傻瓜式分离我的世界服务端、客户端（和通用）模组</h2>
+<h2>方便地将服务端和双端模组从模组文件夹复制出来吧!</h2>
 </div>
 
 ### 仅支持Windows系统
@@ -15,10 +15,11 @@
 
 ## 支持的加载器
 - Fabric & Quilt √(完全支持)
-- Forge & NeoForge ✈(即将推出)
+- NeoForge ⚠(大部分支持)
+- Forge ✈(即将推出)
 
 ## TODO
-- 支持 Forge 与 NeoForge
+- 支持 Forge
 - 更详细护眼的打印与日志系统
 
 ## 协议
