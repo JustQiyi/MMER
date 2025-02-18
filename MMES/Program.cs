@@ -14,7 +14,7 @@ namespace MMES;
 
 public class Program
 {
-    private const string VerCode = "v1.0.2";
+    private const string VerCode = "v1.0.3";
 
     private const string Logo = $@"
 ███╗   ███╗███╗   ███╗███████╗███████╗
@@ -24,7 +24,7 @@ public class Program
 ██║ ╚═╝ ██║██║ ╚═╝ ██║███████╗███████║
 ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝
 MinecraftModEnvironmentSeparators {VerCode}
-支持的模组加载器: Fabric";
+支持的模组加载器: Fabric、Quilt、NeoForge";
 
     private const string HelpMessage = @"帮助信息
 setTargetPath: 设定目标目录
