@@ -82,7 +82,7 @@ internal class Separators
             tomlContent = reader.ReadToEnd();
         }
 
-        // TODO: 到这里不会写了 Forge 的 mods.toml 有点复杂
+        // TODO: feat: forge supported
         var fileName = Path.GetFileName(jarFile);
         var destinationPath = Path.Combine(TargetPath, fileName);
 
