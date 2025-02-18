@@ -131,23 +131,30 @@ help: 查看此消息";
                         using var archive = ZipFile.OpenRead(jarFile);
                         Log($"读取文件 {jarFile}");
 
-                        // TODO: 检测mod所属加载器并分配对应的分离函数
+                        /* WARN: 不保证所有的NeoForge模组都会有neoforge.mods.toml
+                         * 即无法保证正确识别所有NeoForge模组!(例如SinytraConnector)
+                         */
+                        // Fabric
                         var fabricModJsonEntry = archive.Entries.FirstOrDefault(e => e.Name == "fabric.mod.json");
                         if (fabricModJsonEntry != null)
+                        {
                             FabricModSeparator(fabricModJsonEntry, jarFile);
+                        }
                         else
-                            /* Forge incoming
-                            var forgeModTomlEntry = archive.Entries.FirstOrDefault(e => e.Name == "mods.toml");
-                            if (forgeModTomlEntry != null)
+                        {
+                            // NeoForge
+                            var neoForgeModTomlEntry =
+                                archive.Entries.FirstOrDefault(e => e.Name == "neoforge.mods.toml");
+                            if (neoForgeModTomlEntry != null)
                             {
-                                ForgeModSeparator(forgeModTomlEntry, jarFile);
-                                copiedCount++;
+                                NeoForgeModSeparator(neoForgeModTomlEntry, jarFile);
+                                CopiedCount++;
                             }
                             else
                             {
-                                Log($"{jarFile}既不是Forge也不是Fabric模组，已跳过",Error);
-                            }*/
-                            Log($"{jarFile}不是Fabric模组，已跳过", Warn);
+                                Log($"{jarFile}既不是Forge也不是Fabric模组，已跳过", Error);
+                            }
+                        }
                     }
                     catch (Exception ex)
                     {
