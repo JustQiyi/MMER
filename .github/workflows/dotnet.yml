@@ -30,10 +30,11 @@ jobs:
 
     - name: Zip the Build
       run: |
-        cd ./MMES/bin/Release
-        zip -r MMES.zip ./net8.0/ 
-        cd ../../../
-        mv ./MMES/bin/Release/*.zip ./ 
+        curl http://stahlworks.com/dev/zip.exe --output .\zip.exe
+        cd .\MMES\bin\Release
+        ..\..\..\zip -r MMES.zip .\net8.0\ 
+        cd ..\..\..\
+        mv .\MMES\bin\Release\*.zip .\ 
          
     - name: Upload the Build Artifact
       uses: actions/upload-artifact@v4
