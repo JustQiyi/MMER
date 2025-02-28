@@ -133,27 +133,25 @@ help: 查看此消息";
 
                         /* WARN: 不保证所有的NeoForge模组都会有neoforge.mods.toml
                          * 即无法保证正确识别所有NeoForge模组!(例如SinytraConnector)
+                         * WARN2: Forge模组的相关函数还属于实验性质，可能会出现问题
                          */
-                        // Fabric
-                        var fabricModJsonEntry = archive.Entries.FirstOrDefault(e => e.Name == "fabric.mod.json");
-                        if (fabricModJsonEntry != null)
+                        using var zip = ZipFile.OpenRead(jarFile);
+
+                        // 检测模组类型
+                        if (IsFabricMod(zip))
                         {
-                            FabricModSeparator(fabricModJsonEntry, jarFile);
+                            var entry = zip.GetEntry("fabric.mod.json");
+                            FabricModSeparator(entry!, jarFile);
                         }
-                        else
+                        else if (IsForgeMod(zip))
                         {
-                            // NeoForge
-                            var neoForgeModTomlEntry =
-                                archive.Entries.FirstOrDefault(e => e.Name == "neoforge.mods.toml");
-                            if (neoForgeModTomlEntry != null)
-                            {
-                                NeoForgeModSeparator(neoForgeModTomlEntry, jarFile);
-                                CopiedCount++;
-                            }
-                            else
-                            {
-                                Log($"{jarFile}既不是Forge也不是Fabric模组，已跳过", Error);
-                            }
+                            var entry = zip.GetEntry("META-INF/mods.toml");
+                            ForgeModSeparator(entry!, jarFile);
+                        }
+                        else if (IsNeoForgeMod(zip))
+                        {
+                            var entry = zip.GetEntry("META-INF/mods.toml");
+                            NeoForgeModSeparator(entry!, jarFile);
                         }
                     }
                     catch (Exception ex)
@@ -170,4 +168,12 @@ help: 查看此消息";
             }
         });
     }
+    private static bool IsFabricMod(ZipArchive zip)
+    => zip.Entries.Any(e => e.FullName == "fabric.mod.json");
+
+    private static bool IsForgeMod(ZipArchive zip)
+        => zip.Entries.Any(e => e.FullName == "META-INF/mods.toml");
+
+    private static bool IsNeoForgeMod(ZipArchive zip)
+        => zip.Entries.Any(e => e.FullName == "META-INF/neoforge.mods.toml");
 }

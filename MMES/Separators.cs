@@ -1,5 +1,7 @@
 ﻿using System.IO.Compression;
 using Newtonsoft.Json.Linq;
+using Tomlyn;
+using Tomlyn.Model;
 using static MMES.Logger;
 using static MMES.Logger.LogLevel;
 using static MMES.Variables;
@@ -8,126 +10,244 @@ namespace MMES;
 
 internal class Separators
 {
-    internal static void FabricModSeparator(ZipArchiveEntry fabricModJsonEntry, string jarFile)
+    internal static void FabricModSeparator(ZipArchiveEntry entry, string jarFile)
     {
-        string jsonContent;
-        using (var stream = fabricModJsonEntry.Open())
-        using (var reader = new StreamReader(stream))
+        var json = ParseJson(entry);
+        var environment = json["environment"]?.ToString();
+
+        HandleEnvironmentDecision(
+            environment,
+            jarFile,
+            validValues: new[] { "*", "server" },
+            missingMessage: $"{jarFile}的Environment是null",
+            skipMessage: $"{jarFile}的Environment是{{0}}，跳过"
+        );
+    }
+
+    internal static void ForgeModSeparator(ZipArchiveEntry entry, string jarFile)
+    {
+        var toml = ParseToml(entry, jarFile);
+
+        // 修正后的TOML解析方式
+        if (toml.TryGetValue("mods", out var modsObj) &&
+            modsObj is TomlTableArray modsArray &&
+            modsArray.Count > 0)
         {
-            jsonContent = reader.ReadToEnd();
-        }
-
-        var jsonObject = JObject.Parse(jsonContent);
-
-        var environmentJObject = jsonObject["environment"];
-        var environment = environmentJObject?.ToString();
-        if (environmentJObject == null && Variables.KeepStatus == KeepStatus.KeepCopy)
-        {
-            Log($"已按照之前的选项，将Environment为null的文件{jarFile}视为'*'模组", Warn);
-            environment = "*";
-        }
-
-        if (environmentJObject == null && Variables.KeepStatus == KeepStatus.KeepSkip)
-            Log($"已按照之前的选项，跳过了Environment为null的文件{jarFile}", Warn);
-
-        if (environmentJObject == null && Variables.KeepStatus == KeepStatus.Unset)
-        {
-            Log($"{jarFile}的Environment是null，是否复制到TargetPath?", Warn);
-            Log("输入y以继续，n以跳过该文件，k<y/n>以对后续文件执行同样操作。(默认:y)");
-            Console.Write("> ");
-            var enteredString = Console.ReadLine();
-            switch (enteredString)
-            {
-                default:
-                    Variables.KeepStatus = KeepStatus.Unset;
-                    environment = "*";
-                    break;
-                case "n":
-                    Variables.KeepStatus = KeepStatus.Unset;
-                    break;
-                case "ky":
-                    Variables.KeepStatus = KeepStatus.KeepCopy;
-                    environment = "*";
-                    break;
-                case "kn":
-                    Variables.KeepStatus = KeepStatus.KeepSkip;
-                    break;
-            }
-        }
-
-        if (environment == "*" || environment == "server")
-        {
-            var fileName = Path.GetFileName(jarFile);
-            var destinationPath = Path.Combine(TargetPath, fileName);
-
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
-
-            File.Copy(jarFile, destinationPath);
-            Log($"已复制文件: {jarFile} to {destinationPath}", Success);
-            CopiedCount++;
+            var shouldCopy = CheckModSides(modsArray);
+            HandleSideDecision(shouldCopy, jarFile, $"{jarFile} 是客户端专用模组");
         }
         else
         {
-            environment ??= "null";
-            Log($"{jarFile}的Environment是{environment}，跳过", Warn);
+            HandleMissingModsDeclaration(jarFile);
         }
     }
 
-    // feat: neoforge supported
-    // 大致实现方法：解析neoForgeModTomlEntry
-    // 获取 modId 为 Minecraft 的 Dependency 的 side，若 side == "both" 或 "server" 则复制
-    /* Example:
-     * [dependencies.Minecraft]
-     * modId = "minecraft"
-     * version = "1.17.1"
-     * side = "BOTH" or "CLIENT" or "SERVER" :: Important
-     */
-    internal static void NeoForgeModSeparator(ZipArchiveEntry neoForgeModTomlEntry, string jarFile)
+    internal static void NeoForgeModSeparator(ZipArchiveEntry entry, string jarFile)
     {
-        string tomlContent;
-        using (var stream = neoForgeModTomlEntry.Open())
-        using (var reader = new StreamReader(stream))
+        var toml = ParseToml(entry, jarFile);
+
+        // 使用正确的TOML访问方式
+        var dependencies = toml.TryGetValue("dependencies", out var depsObj)
+            ? depsObj as TomlTable
+            : null;
+
+        var minecraftDep = dependencies?.TryGetValue("Minecraft", out var mcObj) == true
+            ? mcObj as TomlTable
+            : null;
+
+        var side = minecraftDep?.TryGetValue("side", out var sideObj) == true
+            ? sideObj.ToString().ToLower()
+            : "client";
+
+        HandleSideDecision(
+            side == "both" || side == "server",
+            jarFile,
+            $"{jarFile} 的Minecraft依赖未配置服务端支持"
+        );
+    }
+
+    private static void HandleMissingModsDeclaration(string jarFile)
+    {
+        string message = $"{jarFile} 缺少mods声明";
+
+        if (Variables.KeepStatus == KeepStatus.KeepCopy)
         {
-            tomlContent = reader.ReadToEnd();
+            CopyJar(jarFile);
+            Log($"{message}，已强制复制", Warn);
+        }
+        else if (Variables.KeepStatus == KeepStatus.KeepSkip)
+        {
+            Log($"{message}，已跳过", Warn);
+        }
+        else
+        {
+            Log($"{message}，是否复制？(y/n/k[y/n])", Warn);
+            if (PromptUser(jarFile)) CopyJar(jarFile);
+        }
+    }
+    #region 核心逻辑
+    private static JObject ParseJson(ZipArchiveEntry entry)
+    {
+        using var stream = entry.Open();
+        using var reader = new StreamReader(stream);
+        return JObject.Parse(reader.ReadToEnd());
+    }
+
+    private static TomlTable ParseToml(ZipArchiveEntry entry, string jarFile)
+    {
+        using var stream = entry.Open();
+        using var reader = new StreamReader(stream);
+        var toml = Toml.Parse(reader.ReadToEnd(), sourcePath: jarFile);
+
+        if (toml.HasErrors)
+        {
+            Log($"无效的TOML格式: {jarFile}", Error);
+            throw new FormatException("Invalid TOML format");
         }
 
-        var tomlLines = tomlContent.Split('\n');
-        string? side = null;
+        return toml.ToModel();
+    }
 
-        foreach (var line in tomlLines)
-            if (line.Trim().StartsWith("modId = \"minecraft\"", StringComparison.OrdinalIgnoreCase))
-            {
-                for (var i = Array.IndexOf(tomlLines, line); i < tomlLines.Length; i++)
-                    if (tomlLines[i].Trim().StartsWith("side = ", StringComparison.OrdinalIgnoreCase))
-                    {
-                        side = tomlLines[i].Split('=')[1].Trim().Trim('"').ToLower();
-                        break;
-                    }
+    private static bool CheckModSides(IEnumerable<TomlTable> modEntries)
+    {
+        foreach (var mod in modEntries)
+        {
+            var side = mod.TryGetValue("side", out var sideObj)
+                ? sideObj.ToString().ToLower()
+                : "both";
 
+            if (side == "server" || side == "both")
+                return true;
+        }
+        return false;
+    }
+    #endregion
+
+    #region 用户交互
+    private static void HandleEnvironmentDecision(
+        string? environment,
+        string jarFile,
+        string[] validValues,
+        string missingMessage,
+        string skipMessage)
+    {
+        var actualValue = HandleNullCase(
+            environment,
+            jarFile,
+            missingMessage,
+            defaultValue: "*"
+        );
+
+        if (validValues.Contains(actualValue?.ToLower()))
+        {
+            CopyJar(jarFile);
+        }
+        else
+        {
+            Log(string.Format(skipMessage, actualValue ?? "null"), Warn);
+        }
+    }
+
+    private static void HandleSideDecision(
+        bool shouldCopy,
+        string jarFile,
+        string clientMessage)
+    {
+        if (shouldCopy)
+        {
+            CopyJar(jarFile);
+        }
+        else
+        {
+            HandleClientCase(jarFile, clientMessage);
+        }
+    }
+
+    private static string? HandleNullCase(
+        string? value,
+        string jarFile,
+        string message,
+        string defaultValue = "*")
+    {
+        if (value != null) return value;
+
+        switch (Variables.KeepStatus)
+        {
+            case KeepStatus.KeepCopy:
+                Log($"{message}，已强制复制", Warn);
+                return defaultValue;
+
+            case KeepStatus.KeepSkip:
+                Log($"{message}，已跳过", Warn);
+                return null;
+
+            default:
+                Log($"{message}，是否复制到TargetPath? (y/n/k[y/n],默认:\"y\")", Warn);
+                return PromptUser(jarFile) ? defaultValue : null;
+        }
+    }
+
+    private static void HandleClientCase(string jarFile, string message)
+    {
+        switch (Variables.KeepStatus)
+        {
+            case KeepStatus.KeepCopy:
+                CopyJar(jarFile);
+                Log($"{message}，已强制复制", Warn);
                 break;
-            }
 
-        if (side == "both" || side == "server")
-        {
-            var fileName = Path.GetFileName(jarFile);
-            var destinationPath = Path.Combine(TargetPath, fileName);
+            case KeepStatus.KeepSkip:
+                Log($"{message}，已跳过", Warn);
+                break;
 
-            if (File.Exists(destinationPath)) File.Delete(destinationPath);
-
-            File.Copy(jarFile, destinationPath);
-            Log($"已复制文件: {jarFile} to {destinationPath}", Success);
-        }
-        else
-        {
-            side ??= "null";
-            Log($"{jarFile}的 side 是{side}，跳过", Warn);
+            default:
+                Log($"{message}，是否复制？(y/n/k[y/n])", Warn);
+                if (PromptUser(jarFile)) CopyJar(jarFile);
+                break;
         }
     }
 
-    internal enum KeepStatus
+    private static bool PromptUser(string jarFile)
     {
-        KeepCopy,
-        KeepSkip,
-        Unset
+        Console.Write("> ");
+        var input = Console.ReadLine()?.ToLower();
+
+        switch (input)
+        {
+            case "ky":
+                Variables.KeepStatus = KeepStatus.KeepCopy;
+                return true;
+
+            case "kn":
+                Variables.KeepStatus = KeepStatus.KeepSkip;
+                return false;
+
+            case "n":
+                return false;
+
+            default: // 包括y和空输入
+                return true;
+        }
     }
+    #endregion
+
+    #region 文件操作
+    private static void CopyJar(string jarFile)
+    {
+        var dest = Path.Combine(TargetPath, Path.GetFileName(jarFile));
+
+        try
+        {
+            File.Copy(jarFile, dest, overwrite: true);
+            Log($"已复制: {jarFile} => {dest}", Success);
+            Interlocked.Increment(ref CopiedCount);
+        }
+        catch (Exception ex)
+        {
+            Log($"复制失败: {ex.Message}", Error);
+        }
+    }
+    #endregion
+
+    internal enum KeepStatus { KeepCopy, KeepSkip, Unset }
 }
