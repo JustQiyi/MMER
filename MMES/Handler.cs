@@ -1,5 +1,5 @@
-﻿using System.IO.Compression;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
+using System.IO.Compression;
 using Tomlyn;
 using Tomlyn.Model;
 using static MMES.Logger;
@@ -8,9 +8,9 @@ using static MMES.Variables;
 
 namespace MMES;
 
-internal class Separators
+internal class Handler
 {
-    internal static void FabricModSeparator(ZipArchiveEntry entry, string jarFile)
+    internal static void FabricModReplicator(ZipArchiveEntry entry, string jarFile)
     {
         var json = ParseJson(entry);
         var environment = json["environment"]?.ToString();
@@ -24,7 +24,7 @@ internal class Separators
         );
     }
 
-    internal static void ForgeModSeparator(ZipArchiveEntry entry, string jarFile)
+    internal static void ForgeModReplicator(ZipArchiveEntry entry, string jarFile)
     {
         var toml = ParseToml(entry, jarFile);
 
@@ -42,7 +42,7 @@ internal class Separators
         }
     }
 
-    internal static void NeoForgeModSeparator(ZipArchiveEntry entry, string jarFile)
+    internal static void NeoForgeModReplicator(ZipArchiveEntry entry, string jarFile)
     {
         var toml = ParseToml(entry, jarFile);
 

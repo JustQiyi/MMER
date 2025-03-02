@@ -8,13 +8,14 @@ using System.IO.Compression;
 using static MMES.Logger;
 using static MMES.Logger.LogLevel;
 using static MMES.Variables;
-using static MMES.Separators;
+using static MMES.Handler;
 
 namespace MMES;
 
 public class Program
 {
-    private const string VerCode = "v1.0.3";
+    private const string VerCode = "v1.1.0";
+    private static bool _isProcessing;
 
     private const string Logo = $@"
 ███╗   ███╗███╗   ███╗███████╗███████╗
@@ -24,7 +25,7 @@ public class Program
 ██║ ╚═╝ ██║██║ ╚═╝ ██║███████╗███████║
 ╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝
 MinecraftModEnvironmentSeparators {VerCode}
-支持的模组加载器: Fabric、Quilt、NeoForge";
+支持的模组加载器: Fabric、Quilt、(Neo)Forge";
 
     private const string HelpMessage = @"帮助信息
 setTargetPath: 设定目标目录
@@ -35,145 +36,170 @@ help: 查看此消息";
     public static async Task Main(string[] args)
     {
         Log(Logo);
-        if (!Directory.Exists(TargetPath)) Directory.CreateDirectory(TargetPath);
+        Directory.CreateDirectory(TargetPath);
         while (ProgramRun)
         {
             Thread.CurrentThread.Name = "Main";
-            Log("输入\"help\"以查看可用命令。");
-            Log($"当前目标位置:{TargetPath}。");
-            Console.Write("> ");
-            var command = Console.ReadLine();
-            switch (command)
+            if (!_isProcessing)
             {
-                case "setTargetPath":
-                    while (true)
-                    {
-                        Log("请输入位置,输入cancel以取消:");
-                        Console.Write("> ");
-                        var enteredString = Console.ReadLine();
-                        if (enteredString == null)
-                        {
-                            Log("请输入文本.", Error);
-                        }
-                        else if (enteredString == "cancel")
-                        {
-                            break;
-                        }
-                        else if (!Path.Exists(enteredString))
-                        {
-                            Log("路径不存在，请重试.", Error);
-                        }
-                        else
-                        {
-                            TargetPath = enteredString;
-                            Log($"已设定为{TargetPath}", Success);
-                            break;
-                        }
-                    }
-
-                    break;
-                case "exit":
-                    ProgramRun = false;
-                    break;
-                default:
-                    Log("无效的命令，请重试。输入\"help\"查看可用命令。", Error);
-                    break;
-                case "help":
-                    Log(HelpMessage);
-                    break;
-                case "start":
-                    while (true)
-                    {
-                        Log("请输入位置,输入cancel以取消:");
-                        Console.Write("> ");
-                        var enteredString = Console.ReadLine();
-                        if (enteredString == null)
-                        {
-                            Log("请输入文本.", Error);
-                        }
-                        else if (enteredString == "cancel")
-                        {
-                            break;
-                        }
-                        else if (!Path.Exists(enteredString))
-                        {
-                            Log("路径不存在，请重试.", Error);
-                        }
-                        else
-                        {
-                            Log($"开始执行任务：{enteredString}到{TargetPath}");
-                            await TaskWorker(enteredString);
-                            break;
-                        }
-                    }
-
-                    break;
+                ShowPrompt();
+                var command = Console.ReadLine()?.Trim();
+                HandleCommand(command);
+            }
+            else
+            {
+                await Task.Delay(50); // 降低CPU占用
             }
         }
     }
 
-    /// <summary>
-    ///     执行任务
-    /// </summary>
-    /// <param name="path">模组文件夹</param>
-    /// <returns>Task</returns>
-    public static Task TaskWorker(string path)
+    private static void ShowPrompt()
+    {
+        Log("输入\"help\"以查看可用命令。");
+        Log($"当前目标位置: {TargetPath}");
+        Console.Write("> ");
+    }
+
+    private static void HandleCommand(string? command)
+    {
+        switch (command?.ToLower())
+        {
+            case "settargetpath":
+                SetTargetPathCommand();
+                break;
+            case "start":
+                StartCommand();
+                break;
+            case "exit":
+                ProgramRun = false;
+                break;
+            case "help":
+                Log(HelpMessage);
+                break;
+            default:
+                if (!string.IsNullOrEmpty(command))
+                    Log("无效命令，输入\"help\"查看帮助", Error);
+                break;
+        }
+    }
+
+    private static void SetTargetPathCommand()
+    {
+        var path = PromptForPath("请输入目标路径（输入 cancel 取消）:");
+        if (path != null)
+        {
+            TargetPath = path;
+            Log($"目标路径已设置为: {TargetPath}", Success);
+        }
+    }
+
+    private static async void StartCommand()
+    {
+        var sourcePath = PromptForPath("请输入源路径（输入 cancel 取消）:");
+        if (sourcePath == null) return;
+
+        _isProcessing = true;
+        try
+        {
+            Log($"开始处理: {sourcePath} → {TargetPath}");
+            await ProcessModsWithLock(sourcePath);
+        }
+        finally
+        {
+            _isProcessing = false;
+        }
+    }
+
+    private static string? PromptForPath(string prompt)
+    {
+        while (true)
+        {
+            Log(prompt);
+            Console.Write("> ");
+            var input = Console.ReadLine()?.Trim();
+
+            if (string.IsNullOrEmpty(input)) continue;
+            if (input.Equals("cancel", StringComparison.OrdinalIgnoreCase)) return null;
+            if (Directory.Exists(input)) return input;
+
+            Log("路径不存在，请检查后重试", Error);
+        }
+    }
+
+    private static Task ProcessModsWithLock(string sourcePath)
     {
         return Task.Run(() =>
         {
             Thread.CurrentThread.Name = "TaskWorker";
             try
             {
-                var jarFiles = Directory.GetFiles(path, "*.jar", SearchOption.AllDirectories);
+                var jarFiles = Directory.GetFiles(sourcePath, "*.jar", SearchOption.AllDirectories);
                 foreach (var jarFile in jarFiles)
+                {
                     try
                     {
-                        using var archive = ZipFile.OpenRead(jarFile);
-                        Log($"读取文件 {jarFile}");
-
-                        /* WARN: 不保证所有的NeoForge模组都会有neoforge.mods.toml
-                         * 即无法保证正确识别所有NeoForge模组!(例如SinytraConnector)
-                         * WARN2: Forge模组的相关函数还属于实验性质，可能会出现问题
-                         */
                         using var zip = ZipFile.OpenRead(jarFile);
+                        Log($"读取文件 {jarFile}", Info);
 
-                        // 检测模组类型
-                        if (IsFabricMod(zip))
+                        var modType = DetectModType(zip);
+                        if (modType == ModType.Unknown)
                         {
-                            var entry = zip.GetEntry("fabric.mod.json");
-                            FabricModSeparator(entry!, jarFile);
+                            Log($"无法识别模组类型: {Path.GetFileName(jarFile)}", Warn);
+                            continue;
                         }
-                        else if (IsForgeMod(zip))
-                        {
-                            var entry = zip.GetEntry("META-INF/mods.toml");
-                            ForgeModSeparator(entry!, jarFile);
-                        }
-                        else if (IsNeoForgeMod(zip))
-                        {
-                            var entry = zip.GetEntry("META-INF/mods.toml");
-                            NeoForgeModSeparator(entry!, jarFile);
-                        }
+
+                        ProcessModFile(zip, jarFile, modType);
                     }
                     catch (Exception ex)
                     {
-                        Log($"在对{jarFile}执行操作时发生错误！错误信息 {ex.Message}", Error);
+                        Log($"处理文件 {Path.GetFileName(jarFile)} 时出错: {ex.Message}", Error);
                     }
-
-                Log($"任务已完成，共{jarFiles.Length}个文件，复制了{CopiedCount}个文件到指定文件夹。", Success);
-                CopiedCount = 0;
+                }
+                Log($"任务完成! 共处理 {jarFiles.Length} 个文件，成功复制 {CopiedCount} 个文件", Success);
+                Interlocked.Exchange(ref CopiedCount, 0);
             }
             catch (Exception ex)
             {
-                Log($"执行任务时出现错误: {ex.Message}", Error);
+                Log($"处理过程中发生严重错误: {ex.Message}", Error);
             }
         });
     }
-    private static bool IsFabricMod(ZipArchive zip)
-    => zip.Entries.Any(e => e.FullName == "fabric.mod.json");
 
-    private static bool IsForgeMod(ZipArchive zip)
-        => zip.Entries.Any(e => e.FullName == "META-INF/mods.toml");
+    private static ModType DetectModType(ZipArchive zip)
+    {
+        foreach (var entry in zip.Entries)
+        {
+            switch (entry.FullName)
+            {
+                case "fabric.mod.json":
+                    return ModType.Fabric;
+                case "META-INF/neoforge.mods.toml":
+                    return ModType.NeoForge;
+                case "META-INF/mods.toml":
+                    return ModType.Forge;
+            }
+        }
+        return ModType.Unknown;
+    }
 
-    private static bool IsNeoForgeMod(ZipArchive zip)
-        => zip.Entries.Any(e => e.FullName == "META-INF/neoforge.mods.toml");
+    private static void ProcessModFile(ZipArchive zip, string jarFile, ModType modType)
+    {
+        switch (modType)
+        {
+            case ModType.Fabric:
+                var fabricEntry = zip.GetEntry("fabric.mod.json");
+                FabricModReplicator(fabricEntry!, jarFile);
+                break;
+            case ModType.Forge:
+                var forgeEntry = zip.GetEntry("META-INF/mods.toml");
+                ForgeModReplicator(forgeEntry!, jarFile);
+                break;
+            case ModType.NeoForge:
+                var neoForgeEntry = zip.GetEntry("META-INF/neoforge.mods.toml");
+                NeoForgeModReplicator(neoForgeEntry!, jarFile);
+                break;
+        }
+    }
 }
+
+public enum ModType { Fabric, Forge, NeoForge, Unknown }

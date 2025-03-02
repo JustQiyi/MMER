@@ -18,7 +18,7 @@ internal struct Logger
     internal static void Log(string content, LogLevel logLevel = LogLevel.Info)
     {
         // TODO: 将日志内容写入文件
-        Thread.CurrentThread.Name ??= "Main";
+        Thread.CurrentThread.Name ??= "Untitled";
         var prefix = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] [{Thread.CurrentThread.Name}/{logLevel.ToString()}] ";
         Console.ForegroundColor = logLevel switch
         {
