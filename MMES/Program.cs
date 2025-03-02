@@ -5,12 +5,12 @@
  */
 
 using System.IO.Compression;
-using static MMES.Logger;
-using static MMES.Logger.LogLevel;
-using static MMES.Variables;
-using static MMES.Handler;
+using static MMER.Logger;
+using static MMER.Logger.LogLevel;
+using static MMER.Variables;
+using static MMER.Handler;
 
-namespace MMES;
+namespace MMER;
 
 public class Program
 {

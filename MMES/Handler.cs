@@ -2,11 +2,11 @@
 using System.IO.Compression;
 using Tomlyn;
 using Tomlyn.Model;
-using static MMES.Logger;
-using static MMES.Logger.LogLevel;
-using static MMES.Variables;
+using static MMER.Logger;
+using static MMER.Logger.LogLevel;
+using static MMER.Variables;
 
-namespace MMES;
+namespace MMER;
 
 internal class Handler
 {

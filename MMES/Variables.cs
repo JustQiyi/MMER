@@ -1,6 +1,6 @@
-﻿using static MMES.Handler;
+﻿using static MMER.Handler;
 
-namespace MMES;
+namespace MMER;
 
 internal class Variables
 {

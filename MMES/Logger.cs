@@ -1,4 +1,4 @@
-﻿namespace MMES;
+﻿namespace MMER;
 
 internal struct Logger
 {
