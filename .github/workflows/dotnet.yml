@@ -34,13 +34,13 @@ jobs:
     - name: Zip the Build
       run: |
         curl http://stahlworks.com/dev/zip.exe --output .\zip.exe
-        cd .\MMES\bin\Release
-        ..\..\..\zip -r MMES.zip .\net8.0\ 
+        cd .\MMER\bin\Release
+        ..\..\..\zip -r MMER.zip .\net8.0\ 
         cd ..\..\..\
-        mv .\MMES\bin\Release\*.zip .\ 
+        mv .\MMER\bin\Release\*.zip .\ 
          
     - name: Upload the Build Artifact
       uses: actions/upload-artifact@v4
       with:
-        name: MMES-Autobuild
-        path: ./MMES.zip
+        name: MMER-Autobuild
+        path: ./MMER.zip
