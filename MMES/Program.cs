@@ -1,5 +1,9 @@
-﻿/*
- * Minecraft Mod Environment Separators
+﻿/*   __  _____  _____________ 
+    /  |/  /  |/  / ____/ __ \
+   / /|_/ / /|_/ / __/ / /_/ /
+  / /  / / /  / / /___/ _, _/ 
+ /_/  /_/_/  /_/_____/_/ |_|  
+ MinecraftModEnvironmentReplicator
  * 作者: JustQiyi
  * 使用MIT协议分发.
  */
@@ -18,13 +22,12 @@ public class Program
     private static bool _isProcessing;
 
     private const string Logo = $@"
-███╗   ███╗███╗   ███╗███████╗███████╗
-████╗ ████║████╗ ████║██╔════╝██╔════╝
-██╔████╔██║██╔████╔██║█████╗  ███████╗
-██║╚██╔╝██║██║╚██╔╝██║██╔══╝  ╚════██║
-██║ ╚═╝ ██║██║ ╚═╝ ██║███████╗███████║
-╚═╝     ╚═╝╚═╝     ╚═╝╚══════╝╚══════╝
-MinecraftModEnvironmentSeparators {VerCode}
+    __  _____  _____________ 
+   /  |/  /  |/  / ____/ __ \
+  / /|_/ / /|_/ / __/ / /_/ /
+ / /  / / /  / / /___/ _, _/ 
+/_/  /_/_/  /_/_____/_/ |_|  
+MinecraftModEnvironmentReplicator {VerCode}
 支持的模组加载器: Fabric、Quilt、(Neo)Forge";
 
     private const string HelpMessage = @"帮助信息
