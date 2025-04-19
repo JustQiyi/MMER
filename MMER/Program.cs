@@ -1,25 +1,24 @@
-﻿/*   __  _____  _____________ 
+﻿/*   __  _____  _____________
     /  |/  /  |/  / ____/ __ \
    / /|_/ / /|_/ / __/ / /_/ /
-  / /  / / /  / / /___/ _, _/ 
- /_/  /_/_/  /_/_____/_/ |_|  
+  / /  / / /  / / /___/ _, _/
+ /_/  /_/_/  /_/_____/_/ |_|
  MinecraftModEnvironmentReplicator
  * 作者: JustQiyi
  * 使用MIT协议分发.
  */
 
 using System.IO.Compression;
+using static MMER.Handler;
 using static MMER.Logger;
 using static MMER.Logger.LogLevel;
 using static MMER.Variables;
-using static MMER.Handler;
 
 namespace MMER;
 
 public class Program
 {
     private const string VerCode = "v1.1.0";
-    private static bool _isProcessing;
 
     private const string Logo = $@"
     __  _____  _____________ 
@@ -35,6 +34,8 @@ setTargetPath: 设定目标目录
 start: 开始复制(将询问要从哪里分离[复制])
 exit: 退出本程序
 help: 查看此消息";
+
+    private static bool _isProcessing;
 
     public static async Task Main(string[] args)
     {
@@ -75,6 +76,7 @@ help: 查看此消息";
                 break;
             case "exit":
                 ProgramRun = false;
+                Log("再见!");
                 break;
             case "help":
                 Log(HelpMessage);
@@ -138,11 +140,10 @@ help: 查看此消息";
             {
                 var jarFiles = Directory.GetFiles(sourcePath, "*.jar", SearchOption.AllDirectories);
                 foreach (var jarFile in jarFiles)
-                {
                     try
                     {
                         using var zip = ZipFile.OpenRead(jarFile);
-                        Log($"读取文件 {jarFile}", Info);
+                        Log($"读取文件 {jarFile}");
 
                         var modType = DetectModType(zip);
                         if (modType == ModType.Unknown)
@@ -157,7 +158,7 @@ help: 查看此消息";
                     {
                         Log($"处理文件 {Path.GetFileName(jarFile)} 时出错: {ex.Message}", Error);
                     }
-                }
+
                 Log($"任务完成! 共处理 {jarFiles.Length} 个文件，成功复制 {CopiedCount} 个文件", Success);
                 Interlocked.Exchange(ref CopiedCount, 0);
             }
@@ -171,7 +172,6 @@ help: 查看此消息";
     private static ModType DetectModType(ZipArchive zip)
     {
         foreach (var entry in zip.Entries)
-        {
             switch (entry.FullName)
             {
                 case "fabric.mod.json":
@@ -181,7 +181,7 @@ help: 查看此消息";
                 case "META-INF/mods.toml":
                     return ModType.Forge;
             }
-        }
+
         return ModType.Unknown;
     }
 
@@ -205,4 +205,10 @@ help: 查看此消息";
     }
 }
 
-public enum ModType { Fabric, Forge, NeoForge, Unknown }
+public enum ModType
+{
+    Fabric,
+    Forge,
+    NeoForge,
+    Unknown
+}

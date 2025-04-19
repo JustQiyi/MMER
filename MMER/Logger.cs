@@ -24,7 +24,7 @@ internal struct Logger
         {
             LogLevel.Error => ConsoleColor.Red,
             LogLevel.Warn => ConsoleColor.Yellow,
-            LogLevel.Info => ConsoleColor.White,
+            LogLevel.Info => ConsoleColor.Gray,
             LogLevel.Success => ConsoleColor.Green,
             _ => ConsoleColor.White
         };

@@ -1,5 +1,5 @@
-﻿using Newtonsoft.Json.Linq;
-using System.IO.Compression;
+﻿using System.IO.Compression;
+using Newtonsoft.Json.Linq;
 using Tomlyn;
 using Tomlyn.Model;
 using static MMER.Logger;
@@ -18,9 +18,9 @@ internal class Handler
         HandleEnvironmentDecision(
             environment,
             jarFile,
-            validValues: new[] { "*", "server" },
-            missingMessage: $"{jarFile}的Environment是null",
-            skipMessage: $"{jarFile}的Environment是{{0}}，跳过"
+            new[] { "*", "server" },
+            $"{jarFile}的Environment是null",
+            $"{jarFile}的Environment是{{0}}，跳过"
         );
     }
 
@@ -68,7 +68,7 @@ internal class Handler
 
     private static void HandleMissingModsDeclaration(string jarFile)
     {
-        string message = $"{jarFile} 缺少mods声明";
+        var message = $"{jarFile} 缺少mods声明";
 
         if (Variables.KeepStatus == KeepStatus.KeepCopy)
         {
@@ -85,7 +85,36 @@ internal class Handler
             if (PromptUser(jarFile)) CopyJar(jarFile);
         }
     }
+
+    #region 文件操作
+
+    private static void CopyJar(string jarFile)
+    {
+        var dest = Path.Combine(TargetPath, Path.GetFileName(jarFile));
+
+        try
+        {
+            File.Copy(jarFile, dest, true);
+            Log($"已复制: {jarFile} => {dest}", Success);
+            Interlocked.Increment(ref CopiedCount);
+        }
+        catch (Exception ex)
+        {
+            Log($"复制失败: {ex.Message}", Error);
+        }
+    }
+
+    #endregion
+
+    internal enum KeepStatus
+    {
+        KeepCopy,
+        KeepSkip,
+        Unset
+    }
+
     #region 核心逻辑
+
     private static JObject ParseJson(ZipArchiveEntry entry)
     {
         using var stream = entry.Open();
@@ -97,7 +126,7 @@ internal class Handler
     {
         using var stream = entry.Open();
         using var reader = new StreamReader(stream);
-        var toml = Toml.Parse(reader.ReadToEnd(), sourcePath: jarFile);
+        var toml = Toml.Parse(reader.ReadToEnd(), jarFile);
 
         if (toml.HasErrors)
         {
@@ -119,11 +148,14 @@ internal class Handler
             if (side == "server" || side == "both")
                 return true;
         }
+
         return false;
     }
+
     #endregion
 
     #region 用户交互
+
     private static void HandleEnvironmentDecision(
         string? environment,
         string jarFile,
@@ -134,18 +166,13 @@ internal class Handler
         var actualValue = HandleNullCase(
             environment,
             jarFile,
-            missingMessage,
-            defaultValue: "*"
+            missingMessage
         );
 
         if (validValues.Contains(actualValue?.ToLower()))
-        {
             CopyJar(jarFile);
-        }
         else
-        {
             Log(string.Format(skipMessage, actualValue ?? "null"), Warn);
-        }
     }
 
     private static void HandleSideDecision(
@@ -154,13 +181,9 @@ internal class Handler
         string clientMessage)
     {
         if (shouldCopy)
-        {
             CopyJar(jarFile);
-        }
         else
-        {
             HandleClientCase(jarFile, clientMessage);
-        }
     }
 
     private static string? HandleNullCase(
@@ -229,25 +252,6 @@ internal class Handler
                 return true;
         }
     }
+
     #endregion
-
-    #region 文件操作
-    private static void CopyJar(string jarFile)
-    {
-        var dest = Path.Combine(TargetPath, Path.GetFileName(jarFile));
-
-        try
-        {
-            File.Copy(jarFile, dest, overwrite: true);
-            Log($"已复制: {jarFile} => {dest}", Success);
-            Interlocked.Increment(ref CopiedCount);
-        }
-        catch (Exception ex)
-        {
-            Log($"复制失败: {ex.Message}", Error);
-        }
-    }
-    #endregion
-
-    internal enum KeepStatus { KeepCopy, KeepSkip, Unset }
 }
