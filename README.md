@@ -1,5 +1,5 @@
 <div align="center">
-<h1>MMER (旧: MMES)</h1>
+<h1>MMER</h1>
 <h2>方便地将服务端和双端模组从模组文件夹复制出来吧!</h2>
 </div>
 
@@ -36,4 +36,4 @@
 - 以及其它......
 
 ## 许可证
-本项目采用 MIT 协议。有关更多信息，请参阅 [LICENSE]([LICENSE](https://github.com/JustQiyi/MMES/blob/master/LICENSE.txt))。
+本项目采用 MIT 协议。有关更多信息，请参阅 [LICENSE](https://github.com/JustQiyi/MMER/blob/master/LICENSE.txt)。
